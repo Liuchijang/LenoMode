@@ -1,0 +1,238 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:LenoMode;assembly=LenoMode"
+        Title="LenoMode" Width="1040" Height="860" MinWidth="560" MinHeight="480"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource Bg}" Foreground="{DynamicResource Fg}"
+        FontFamily="Segoe UI" FontSize="13"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display">
+  <Window.Resources>
+    <Style x:Key="Mono11" TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="{DynamicResource Mono}"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Foreground" Value="{DynamicResource FgMuted}"/>
+    </Style>
+    <Style x:Key="Body" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="12.5"/>
+      <Setter Property="Foreground" Value="{DynamicResource FgMuted}"/>
+      <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    <Style x:Key="SectionTitle" TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="{DynamicResource Mono}"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Margin" Value="8,0,0,0"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Collapsible section header: flat, the whole row is the hit target. -->
+    <Style x:Key="SectionHead" TargetType="Button">
+      <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Background="Transparent">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Squared outline pill: mono label, 2px corners. Active state is colored from code. -->
+    <Style x:Key="Pill" TargetType="Button">
+      <Setter Property="FontFamily" Value="{DynamicResource Mono}"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource FgMuted}"/>
+      <Setter Property="Padding" Value="12,6"/>
+      <Setter Property="Margin" Value="0,0,8,8"/>
+      <Setter Property="MinHeight" Value="32"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="b" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="1" CornerRadius="2" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource Fg}"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource Red}"/>
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="b" Property="Opacity" Value="0.4"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="ModeBtn" TargetType="Button">
+      <Setter Property="Background" Value="{DynamicResource Surface}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Fg}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Outline}"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Margin" Value="0,0,10,10"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="b" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="1" CornerRadius="4" Padding="16,14">
+              <ContentPresenter HorizontalAlignment="Stretch"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource FgMuted}"/>
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource Red}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Thin flat scrollbar instead of the light system one. -->
+    <Style TargetType="ScrollBar">
+      <Setter Property="Width" Value="8"/>
+      <Setter Property="MinWidth" Value="8"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Track x:Name="PART_Track" IsDirectionReversed="True">
+              <Track.Thumb>
+                <Thumb>
+                  <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                      <Border Background="{DynamicResource Outline}" CornerRadius="2" Margin="2,0"/>
+                    </ControlTemplate>
+                  </Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+            </Track>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+
+  <DockPanel>
+    <!-- Top bar: dot texture + mono title + VI|EN + red marker -->
+    <StackPanel DockPanel.Dock="Top">
+      <l:DotField Height="10" Margin="20,8,20,0"/>
+      <DockPanel Margin="20,2,20,6" LastChildFill="False">
+        <TextBlock Text="LENOMODE" FontFamily="{DynamicResource Mono}" FontSize="22" FontWeight="Bold" VerticalAlignment="Center"/>
+        <TextBlock x:Name="Device" Style="{StaticResource Mono11}" Margin="14,5,0,0" VerticalAlignment="Center"/>
+        <Ellipse DockPanel.Dock="Right" Width="10" Height="10" Fill="{DynamicResource Red}" Margin="14,0,0,0" VerticalAlignment="Center"/>
+        <StackPanel x:Name="LangHost" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"/>
+      </DockPanel>
+      <Rectangle Height="1" Fill="{DynamicResource Outline}"/>
+    </StackPanel>
+
+    <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource Outline}" BorderThickness="0,1,0,0" Padding="20,7">
+      <TextBlock x:Name="Footer" Style="{StaticResource Mono11}" TextTrimming="CharacterEllipsis"/>
+    </Border>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+      <StackPanel Margin="20,4,20,20">
+
+        <StackPanel Margin="0,18,0,12">
+          <StackPanel Orientation="Horizontal">
+            <Rectangle Width="9" Height="9" Fill="{DynamicResource Red}"/>
+            <TextBlock Tag="sec.thermal" Style="{StaticResource SectionTitle}"/>
+          </StackPanel>
+          <Rectangle Height="1" Fill="{DynamicResource Outline}" Margin="0,6,0,0"/>
+        </StackPanel>
+        <UniformGrid x:Name="ModeGrid" Columns="3" Margin="0,0,-10,0"/>
+        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+          <Ellipse x:Name="ModeStatusDot" Width="8" Height="8" Margin="0,0,8,0" VerticalAlignment="Center"/>
+          <TextBlock x:Name="ModeStatus" Style="{StaticResource Mono11}" VerticalAlignment="Center"/>
+        </StackPanel>
+        <WrapPanel x:Name="BootRow" Margin="0,10,0,0"/>
+
+        <StackPanel Margin="0,26,0,12">
+          <StackPanel Orientation="Horizontal">
+            <Rectangle Width="9" Height="9" Fill="{DynamicResource Red}"/>
+            <TextBlock Tag="sec.power" Style="{StaticResource SectionTitle}"/>
+          </StackPanel>
+          <Rectangle Height="1" Fill="{DynamicResource Outline}" Margin="0,6,0,0"/>
+        </StackPanel>
+        <WrapPanel x:Name="PowerRow"/>
+        <TextBlock Tag="power.note" Style="{StaticResource Body}" Margin="0,2,0,0"/>
+
+        <!-- Monitoring first, settings (overlay, app) last. Live, comparison and overlay collapse. -->
+        <Button x:Name="LiveHead" Style="{StaticResource SectionHead}" Margin="0,26,0,0">
+          <StackPanel>
+            <DockPanel>
+              <Rectangle Width="9" Height="9" Fill="{DynamicResource Red}"/>
+              <TextBlock x:Name="LiveChevron" DockPanel.Dock="Right" Style="{StaticResource Mono11}" FontSize="14" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+              <TextBlock Tag="sec.live" Style="{StaticResource SectionTitle}"/>
+              <TextBlock x:Name="LiveRight" Style="{StaticResource Mono11}" HorizontalAlignment="Right" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="16,0,0,0"/>
+            </DockPanel>
+            <Rectangle Height="1" Fill="{DynamicResource Outline}" Margin="0,6,0,0"/>
+          </StackPanel>
+        </Button>
+        <StackPanel x:Name="LiveBody" Margin="0,12,0,0">
+          <UniformGrid x:Name="TileGrid" Columns="4" Margin="0,0,-10,0"/>
+        </StackPanel>
+
+        <Button x:Name="SessionHead" Style="{StaticResource SectionHead}" Margin="0,26,0,0">
+          <StackPanel>
+            <DockPanel>
+              <Rectangle Width="9" Height="9" Fill="{DynamicResource Red}"/>
+              <TextBlock x:Name="SessionChevron" DockPanel.Dock="Right" Style="{StaticResource Mono11}" FontSize="14" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+              <TextBlock Tag="sec.session" Style="{StaticResource SectionTitle}"/>
+            </DockPanel>
+            <Rectangle Height="1" Fill="{DynamicResource Outline}" Margin="0,6,0,0"/>
+          </StackPanel>
+        </Button>
+        <StackPanel x:Name="SessionBody" Margin="0,12,0,0">
+          <WrapPanel x:Name="SessionBar"/>
+          <TextBlock x:Name="TestStatus" Style="{StaticResource Body}" Margin="0,2,0,0"/>
+          <Border BorderBrush="{DynamicResource Outline}" Background="{DynamicResource Surface}" BorderThickness="1" CornerRadius="4" Margin="0,12,0,0" Padding="14,10">
+            <Grid x:Name="SessionTable"/>
+          </Border>
+          <TextBlock Tag="session.note" Style="{StaticResource Body}" Margin="0,8,0,0"/>
+        </StackPanel>
+
+        <Button x:Name="OverlayHead" Style="{StaticResource SectionHead}" Margin="0,26,0,0">
+          <StackPanel>
+            <DockPanel>
+              <Rectangle Width="9" Height="9" Fill="{DynamicResource Red}"/>
+              <TextBlock x:Name="OverlayChevron" DockPanel.Dock="Right" Style="{StaticResource Mono11}" FontSize="14" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+              <TextBlock Tag="sec.overlay" Style="{StaticResource SectionTitle}"/>
+            </DockPanel>
+            <Rectangle Height="1" Fill="{DynamicResource Outline}" Margin="0,6,0,0"/>
+          </StackPanel>
+        </Button>
+        <StackPanel x:Name="OverlayBody" Margin="0,12,0,0">
+          <WrapPanel x:Name="OverlayRow"/>
+          <Grid x:Name="OverlayGrid" Margin="0,6,0,0"/>
+          <TextBlock x:Name="HotkeyNote" Style="{StaticResource Body}" Margin="0,2,0,0"/>
+        </StackPanel>
+
+        <StackPanel Margin="0,26,0,12">
+          <StackPanel Orientation="Horizontal">
+            <Rectangle Width="9" Height="9" Fill="{DynamicResource Red}"/>
+            <TextBlock Tag="sec.app" Style="{StaticResource SectionTitle}"/>
+          </StackPanel>
+          <Rectangle Height="1" Fill="{DynamicResource Outline}" Margin="0,6,0,0"/>
+        </StackPanel>
+        <WrapPanel x:Name="AppRow"/>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

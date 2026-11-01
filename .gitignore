@@ -1,0 +1,7 @@
+# build output: the exe ships as a GitHub release asset
+bin/
+
+# internal AI notes, kept local
+CLAUDE.md
+.claude/
+claude-memory/
