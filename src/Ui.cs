@@ -14,7 +14,26 @@ namespace LenoMode
         public static SolidColorBrush Bg, Surface, SurfaceVar, Fg, FgMuted, Outline, DotOff, Ok, Warn, Bad;
         public static readonly SolidColorBrush Red = B(0xFFD71921);   // fills only; red text uses Bad
         public static readonly SolidColorBrush White = B(0xFFFFFFFF);
-        public static readonly FontFamily Mono = new FontFamily("Cascadia Mono, Consolas");
+        public static readonly FontFamily Mono = PickMono();
+
+        // Windows Terminal registers Cascadia as a packaged font under WindowsApps; after a Terminal update some
+        // faces become unreadable and WPF throws UnauthorizedAccessException on first layout (crash at startup,
+        // 2026-11-15). Touch every face up front and fall back to Consolas if any of them fails.
+        static FontFamily PickMono()
+        {
+            try
+            {
+                var cascadia = new FontFamily("Cascadia Mono");
+                foreach (var t in cascadia.GetTypefaces())
+                {
+                    GlyphTypeface g;
+                    if (t.TryGetGlyphTypeface(out g)) { var n = g.CharacterToGlyphMap.Count; }
+                }
+                foreach (var ft in cascadia.FamilyTypefaces) { }
+                return new FontFamily("Cascadia Mono, Consolas");
+            }
+            catch (Exception) { return new FontFamily("Consolas"); }
+        }
 
         static SolidColorBrush B(uint argb)
         {
