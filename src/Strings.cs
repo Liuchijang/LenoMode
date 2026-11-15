@@ -80,6 +80,9 @@ namespace LenoMode
             { "tray.open", new[] { "Open LenoMode", "Mở LenoMode" } },
             { "tray.overlay", new[] { "Overlay", "Overlay" } },
             { "tray.exit", new[] { "Exit", "Thoát" } },
+            { "tray.icon", new[] { "Tray icon", "Icon khay" } },
+            { "tray.i.graph", new[] { "GRAPH", "BIỂU ĐỒ" } },
+            { "tray.i.dino", new[] { "DINO", "KHỦNG LONG" } },
             { "tray.running", new[] { "RUNNING · {0}", "ĐANG CHẠY · {0}" } },
             { "tray.on", new[] { "ON", "BẬT" } },
             { "tray.off", new[] { "OFF", "TẮT" } },
@@ -166,6 +169,7 @@ namespace LenoMode
         static readonly string FilePath = Path.Combine(Dir, "settings.ini");
         public static int TestSeconds = 60;
         public static bool OverlayOn, TestLoad;
+        public static int TrayIcon = Tray.IconGraph;
         public static int OverlayCorner, OverlayFields = Overlay.DefaultFields, OverlaySize = 1, OverlayOpacity = 2;
         public static bool OverlayBar;
         public static double OverlayX = -1, OverlayY = -1;   // dragged position (fraction of the work area); -1 = corner
@@ -189,13 +193,15 @@ namespace LenoMode
                     else if (k == "overlaySize") int.TryParse(v, out OverlaySize);
                     else if (k == "overlayOpacity") int.TryParse(v, out OverlayOpacity);
                     else if (k == "overlayBar") OverlayBar = v == "1";
+                    else if (k == "trayIcon") int.TryParse(v, out TrayIcon);
                     else if (k == "overlayX") double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out OverlayX);
                     else if (k == "overlayY") double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out OverlayY);
                 }
-                if (TestSeconds < 10) TestSeconds = 60;
+                if (TestSeconds < 10 || TestSeconds > 600) TestSeconds = 60;   // the UI only offers 30 / 60 / 120
                 if ((OverlayFields & ((1 << Overlay.FieldCount) - 1)) == 0) OverlayFields = Overlay.DefaultFields;
                 OverlaySize = Math.Max(0, Math.Min(2, OverlaySize));
                 OverlayOpacity = Math.Max(0, Math.Min(2, OverlayOpacity));
+                if (TrayIcon < 0 || TrayIcon > 2) TrayIcon = Tray.IconGraph;
             }
             catch (Exception) { }
         }
@@ -208,7 +214,7 @@ namespace LenoMode
                 File.WriteAllLines(FilePath, new[] { "lang=" + (L.Vi ? "vi" : "en"), "testSeconds=" + TestSeconds,
                     "overlay=" + (OverlayOn ? "1" : "0"), "testLoad=" + (TestLoad ? "1" : "0"), "overlayCorner=" + (OverlayCorner & 3),
                     "overlayFields=" + OverlayFields, "overlaySize=" + OverlaySize, "overlayOpacity=" + OverlayOpacity,
-                    "overlayBar=" + (OverlayBar ? "1" : "0"),
+                    "overlayBar=" + (OverlayBar ? "1" : "0"), "trayIcon=" + TrayIcon,
                     "overlayX=" + OverlayX.ToString("0.####", CultureInfo.InvariantCulture),
                     "overlayY=" + OverlayY.ToString("0.####", CultureInfo.InvariantCulture) });
             }

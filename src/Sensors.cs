@@ -12,6 +12,7 @@ namespace LenoMode
         public DateTime Time;
         public ThermalMode Mode = ThermalMode.Unknown;
         public bool ModeRead;
+        public bool Light;   // tray-only sample: CPU counters (and maybe the mode), nothing else filled in
         public double CpuLoad, CpuGhz, CpuThrottle;   // CpuThrottle: % below the allowed max clock (0 = not limited)
         public double GpuTotal, GpuGame;
         public string GameName;
@@ -105,9 +106,13 @@ namespace LenoMode
             catch (Exception) { }
         }
 
-        public Sample Read(bool readMode)
+        /// <summary>
+        /// full = false: only the CPU counters (the tray icon's load), for when nothing on screen shows the rest.
+        /// GPU engine + memory counters and the two WMI queries cost ~7 ms of CPU per sample (measured 2026-11-16).
+        /// </summary>
+        public Sample Read(bool readMode, bool full)
         {
-            var s = new Sample { Time = DateTime.Now };
+            var s = new Sample { Time = DateTime.Now, Light = !full };
 
             var p = proc.Read();
             s.CpuLoad = Math.Min(100, Get(p, "% Processor Utility", "_Total"));
@@ -119,12 +124,15 @@ namespace LenoMode
             s.CpuThrottle = p.TryGetValue("% Performance Limit", out lim) && lim.TryGetValue("_Total", out allowed)
                 ? Math.Max(0, 100 - allowed) : 0;
 
-            int gamePid = ReadGpu(s);
-            ReadFps(s, gamePid);
-            ReadGpuMemory(s);
-            ReadMemory(s);
-            ReadPower(s);
-            s.TempC = ReadTemp();
+            if (full)
+            {
+                int gamePid = ReadGpu(s);
+                ReadFps(s, gamePid);
+                ReadGpuMemory(s);
+                ReadMemory(s);
+                ReadPower(s);
+                s.TempC = ReadTemp();
+            }
 
             if (readMode)
             {

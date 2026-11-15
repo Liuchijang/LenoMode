@@ -64,7 +64,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1   # -> bin\LenoMode.exe
 <tr>
 <td valign="top">🔋 <b>Windows power mode</b><br>The Settings power slider, for the power source in use (AC or battery).</td>
 <td valign="top">💾 <b>BIOS boot default</b><br>Saves the current mode as the BIOS <code>SystemPerformanceMode</code>, which applies at the next boot. One UAC prompt.</td>
-<td valign="top">🧭 <b>Tray and autostart</b><br>Closing hides to the tray; <i>Start with Windows</i> launches it hidden. Single instance.</td>
+<td valign="top">🧭 <b>Tray and autostart</b><br>Closing hides to the tray; <i>Start with Windows</i> launches it hidden. Single instance. Tray icon can show a 7 s CPU graph or a running pixel dino that speeds up with load.</td>
 </tr>
 </table>
 
@@ -116,7 +116,7 @@ powrprof overlay ──► Windows power mode
 | `src/Overlay.cs` | In-game overlay window |
 | `src/CpuStress.cs` | Fixed all-core load for the auto test |
 | `src/Main.cs` | Window logic, comparison stats, auto test, CSV |
-| `src/Tray.cs` | Tray icon, menu, HKCU Run autostart |
+| `src/Tray.cs` | Tray icon (CPU graph, running dino), menu, HKCU Run autostart |
 | `src/Ui.cs` | Palette, dot-matrix field, charts and tiles |
 | `src/MainWindow.xaml` | Layout and styles, embedded and loaded at runtime |
 | `src/Strings.cs` | English / Vietnamese strings, settings |

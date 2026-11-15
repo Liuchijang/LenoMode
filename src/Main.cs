@@ -58,6 +58,12 @@ namespace LenoMode
                 MessageBox.Show(e.Exception.Message, "LenoMode", MessageBoxButton.OK, MessageBoxImage.Error);
                 e.Handled = true;
             };
+            // The tray menu is WinForms: its paint/click errors bypass the WPF handler and would open WinForms'
+            // own "unhandled exception" dialog. Log them instead; the menu keeps working.
+            System.Windows.Forms.Application.SetUnhandledExceptionMode(System.Windows.Forms.UnhandledExceptionMode.CatchException);
+            System.Windows.Forms.Application.ThreadException += (s, e) => LogError(e.Exception);
+            // Background threads (sampler, auto test) still end the process, but leave a trace first.
+            AppDomain.CurrentDomain.UnhandledException += (s, e) => { var ex = e.ExceptionObject as Exception; if (ex != null) LogError(ex); };
             Palette.Install(app.Resources);
             Settings.Load();
             var ui = new MainUi(new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName));
@@ -124,6 +130,9 @@ namespace LenoMode
         Sensors sensors;   // built on the sampler thread: WMI + perf counter setup costs ~350 ms (measured 2026-10-31)
         readonly Overlay overlay = new Overlay();
         readonly ManualResetEvent stop = new ManualResetEvent(false);
+        Thread sampler;
+        // Set on the UI thread, read by the sampler: what the next samples need to cover.
+        volatile bool fullSampling = true, modeShown = true, modeSoon;
 
         // thermal mode
         ThermalMode current = ThermalMode.Unknown, pending = ThermalMode.Unknown;
@@ -201,9 +210,14 @@ namespace LenoMode
             tray.ExitRequested += Exit;
             tray.OverlayRequested += ToggleOverlay;
             tray.ModeRequested += SetMode;
+            tray.AdminRequested += RelaunchAsAdmin;
+            tray.ShowAdmin = !IsAdmin();
+            tray.MenuOpening += delegate { modeSoon = true; };   // the menu lists the mode: refresh it while it is open
 
             Window.SourceInitialized += delegate { DarkTitleBar(); RegisterHotkeys(); Start(); };
             Window.SizeChanged += delegate { Relayout(); };
+            Window.IsVisibleChanged += delegate { UpdateSampling(); if (Window.IsVisible) modeSoon = true; };
+            Window.StateChanged += delegate { UpdateSampling(); };
             Window.Closing += (sender, e) =>
             {
                 // Close hides to the tray; the hotkeys and overlay keep working. Exit is in the tray menu.
@@ -697,28 +711,69 @@ namespace LenoMode
             RefreshPower();
             ThreadPool.QueueUserWorkItem(delegate { ReadBootDefault(); });
             if (Settings.OverlayOn) ToggleOverlay();
-            var t = new Thread(SamplerLoop) { IsBackground = true, Name = "sampler" };
-            t.Start();
+            UpdateSampling();
+            sampler = new Thread(SamplerLoop) { IsBackground = true, Name = "sampler" };
+            sampler.Start();
+        }
+
+        /// <summary>
+        /// Idle in the tray (window hidden or minimized, no overlay, no recording or test) nothing shows GPU, temp,
+        /// power or FPS, so the sampler reads only the CPU load for the tray icon and reads the mode less often.
+        /// </summary>
+        void UpdateSampling()
+        {
+            bool windowShown = Window.IsVisible && Window.WindowState != WindowState.Minimized;
+            modeShown = windowShown || overlay.Visible;   // both display the mode, so both get the fast mode read
+            fullSampling = modeShown || recording || testThread != null;
         }
 
         void SamplerLoop()
         {
             try { sensors = new Sensors(frameCounter); }
             catch (Exception ex) { Program.LogError(ex); return; }
-            frameCounter.Start();
-            int n = 0;
+            DateTime nextMode = DateTime.MinValue, lightSince = DateTime.MaxValue;
+            bool trimmed = false;
             while (true)
             {
                 var t0 = DateTime.UtcNow;
+                bool full = fullSampling;
+                if (full) { lightSince = DateTime.MaxValue; trimmed = false; }
+                else if (lightSince == DateTime.MaxValue) lightSince = t0;
+                else if (!trimmed && t0 - lightSince > TimeSpan.FromSeconds(5))
+                {
+                    // Idle in the tray the window's pages (WPF, XAML, charts) sit unused: hand them back to Windows.
+                    // They fault back in when the window opens again.
+                    trimmed = true;
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    using (var me = Process.GetCurrentProcess()) SetProcessWorkingSetSize(me.Handle, (IntPtr)(-1), (IntPtr)(-1));
+                }
+                // The ETW session only runs while FPS can be shown; a failed start (not admin) is not retried.
+                if (full != frameCounter.Running && frameCounter.Error == null)
+                {
+                    if (full) frameCounter.Start();
+                    else frameCounter.Stop();
+                }
+                // An ITS mode read costs ~70 ms of kernel CPU (the driver polls the EC; measured 2026-11-16), more than
+                // all other sensors together: every 2 s while the window or overlay shows it, else every 10 s at most,
+                // so an external change (Fn+Q, Vantage) shows within 10 s (the tray menu or window reads it at once).
+                bool readMode = modeSoon || t0 >= nextMode;
+                if (readMode)
+                {
+                    modeSoon = false;
+                    nextMode = t0.AddSeconds(modeShown ? 2 : 10);
+                }
                 Sample s = null;
-                try { s = sensors.Read(n % 2 == 0); }
+                try { s = sensors.Read(readMode, full); }
                 catch (Exception ex) { Program.LogError(ex); }
-                n++;
                 if (s != null) Ui(delegate { OnSample(s); });
                 int wait = 1000 - (int)(DateTime.UtcNow - t0).TotalMilliseconds;
                 if (stop.WaitOne(Math.Max(50, wait))) return;
             }
         }
+
+        [DllImport("kernel32.dll")]
+        static extern bool SetProcessWorkingSetSize(IntPtr process, IntPtr min, IntPtr max);
 
         void Shutdown()
         {
@@ -728,6 +783,8 @@ namespace LenoMode
                 testThread.Join(15000);   // its finally block restores the original mode
             }
             stop.Set();
+            // The sampler starts and stops the ETW session: let it finish its pass so it cannot restart it after this.
+            if (sampler != null) sampler.Join(3000);
             frameCounter.Stop();
             overlay.Close();
             IntPtr h = new WindowInteropHelper(Window).Handle;
@@ -753,7 +810,12 @@ namespace LenoMode
             });
         }
 
-        static bool IsAdmin()
+        // Elevation cannot change during the process lifetime; RenderSample asks every second.
+        static readonly bool Elevated = CheckAdmin();
+
+        static bool IsAdmin() { return Elevated; }
+
+        static bool CheckAdmin()
         {
             using (var id = System.Security.Principal.WindowsIdentity.GetCurrent())
                 return new System.Security.Principal.WindowsPrincipal(id).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
@@ -912,6 +974,7 @@ namespace LenoMode
 
         void OnSample(Sample s)
         {
+            if (exiting) return;   // queued by the sampler before Exit disposed the tray
             if (s.ModeRead && !busy && testThread == null && s.Mode != current)
             {
                 Program.LogMode((current == ThermalMode.Unknown ? "startup read " : "external change from " + Thermal.Names[(int)current] + " to ")
@@ -925,6 +988,13 @@ namespace LenoMode
                 RefreshPower();
                 bool v = Its.VantageRunning();
                 if (v != vantage) { vantage = v; RenderModes(); }
+            }
+            UpdateSampling();   // catches overlay / recording / test changes within a second
+            if (s.Light)
+            {
+                // Nothing to render or record; `last` keeps the previous full sample for the window.
+                tray.SetLoad(s.CpuLoad);
+                return;
             }
 
             bool rec = testThread != null ? testRecording : recording;
@@ -940,6 +1010,7 @@ namespace LenoMode
             last = s;
             RenderSample(s, true);
             overlay.Update(s);
+            tray.SetLoad(s.CpuLoad);
             RenderSession();
         }
 
